@@ -62,6 +62,7 @@ let professorImgSwitchTimer = 0;
 
 //ui
 const table = { x: 0, y: 0, width: 660, height: 495 }; // 放大球桌尺寸
+const tableCollision = { x: 0, y: 0, width: 660, height: 425 }; // 實際碰撞區域
 
 export default function PingpongGame() {
   const sketch = (p5: p5Types) => {
@@ -93,6 +94,9 @@ export default function PingpongGame() {
       // 重新計算桌子位置
       table.x = (p5.windowWidth - table.width) / 2;
       table.y = (p5.windowHeight - table.height) / 2;
+      // 更新碰撞區域位置
+      tableCollision.x = table.x;
+      tableCollision.y = table.y - 10; // 向上偏移10px
       resetPositions(p5);
     };
 
@@ -102,6 +106,9 @@ export default function PingpongGame() {
       // 初始化桌子位置
       table.x = (p5.windowWidth - table.width) / 2;
       table.y = (p5.windowHeight - table.height) / 2;
+      // 初始化碰撞區域位置
+      tableCollision.x = table.x;
+      tableCollision.y = table.y + 10; // 向上偏移10px
       resetPositions(p5);
     };
 
@@ -280,7 +287,10 @@ export default function PingpongGame() {
         ballX += ballSpeedX;
         ballY += ballSpeedY;
 
-        if (ballY + 7 >= table.y && ballY + 7 <= table.y + table.height) {
+        if (
+          ballY + 7 >= tableCollision.y &&
+          ballY + 7 <= tableCollision.y + tableCollision.height
+        ) {
           if (ballX < table.x + table.width / 2 && bounceCountPlayer < 1) {
             bounceCountPlayer++;
           } else if (ballX >= table.x + table.width / 2 && bounceCountAI < 1) {
@@ -305,9 +315,15 @@ export default function PingpongGame() {
           switchServe(p5);
         }
 
-        if (ballY < -30 || ballY > p5.height + 30) {
-          if (ballX < table.x + table.width / 2) playerScore++;
-          else aiScore++;
+        if (
+          ballY < tableCollision.y ||
+          ballY > tableCollision.y + tableCollision.height
+        ) {
+          if (ballX < table.x + table.width / 2) {
+            aiScore++;
+          } else {
+            playerScore++;
+          }
           switchServe(p5);
         }
       }
@@ -316,8 +332,8 @@ export default function PingpongGame() {
       if (p5.keyIsDown(p5.DOWN_ARROW)) playerY += 6;
       playerY = p5.constrain(
         playerY,
-        table.y,
-        table.y + table.height - paddleHeight
+        tableCollision.y - 60,
+        tableCollision.y + tableCollision.height - paddleHeight
       );
 
       // 計算玩家球拍速度
@@ -329,10 +345,19 @@ export default function PingpongGame() {
         if (Math.random() < 0.4) aiY += (targetY - aiY) * 0.1;
       } else {
         if (Math.random() < 0.02) {
-          aiY += (table.y + table.height / 2 - paddleHeight / 2 - aiY) * 0.1;
+          aiY +=
+            (tableCollision.y +
+              tableCollision.height / 2 -
+              paddleHeight / 2 -
+              aiY) *
+            0.1;
         }
       }
-      aiY = p5.constrain(aiY, table.y, table.y + table.height - paddleHeight);
+      aiY = p5.constrain(
+        aiY,
+        tableCollision.y - 60,
+        tableCollision.y + tableCollision.height - paddleHeight
+      );
 
       // 計算AI球拍速度
       aiVelocity = aiY - lastAiY;
@@ -361,10 +386,15 @@ export default function PingpongGame() {
       ) {
         const relY = playerY + paddleHeight / 2 - ballY;
         const norm = relY / (paddleHeight / 2);
-        // 根據球拍移動速度調整角度
-        const baseAngle = norm * (Math.PI / 12);
-        const velocityFactor = playerVelocity * 0.1; // 調整速度影響因子
-        const angle = baseAngle + velocityFactor;
+        // 基礎角度：根據擊球位置決定
+        const baseAngle = norm * (Math.PI / 6); // 增加基礎角度範圍
+        // 速度影響：根據球拍移動速度調整
+        const velocityFactor = playerVelocity * 0.2; // 增加速度影響
+        // 確保球往球桌內打：限制角度範圍
+        const angle = Math.max(
+          Math.min(baseAngle + velocityFactor, Math.PI / 4),
+          -Math.PI / 4
+        );
         const speed = 8;
         ballSpeedX = speed * Math.cos(angle);
         ballSpeedY = -speed * Math.sin(angle);
@@ -377,10 +407,15 @@ export default function PingpongGame() {
       if (ballX + 7 > aiPaddleX && ballY > aiY && ballY < aiY + paddleHeight) {
         const relY = aiY + paddleHeight / 2 - ballY;
         const norm = relY / (paddleHeight / 2);
-        // 根據球拍移動速度調整角度
-        const baseAngle = norm * (Math.PI / 12);
-        const velocityFactor = aiVelocity * 0.1; // 調整速度影響因子
-        const angle = baseAngle + velocityFactor;
+        // 基礎角度：根據擊球位置決定
+        const baseAngle = norm * (Math.PI / 6); // 增加基礎角度範圍
+        // 速度影響：根據球拍移動速度調整
+        const velocityFactor = aiVelocity * 0.2; // 增加速度影響
+        // 確保球往球桌內打：限制角度範圍
+        const angle = Math.max(
+          Math.min(baseAngle + velocityFactor, Math.PI / 4),
+          -Math.PI / 4
+        );
         const speed = 8;
         ballSpeedX = -speed * Math.cos(angle);
         ballSpeedY = -speed * Math.sin(angle);
@@ -436,7 +471,7 @@ export default function PingpongGame() {
           ballX = table.x + 20;
           ballY = playerY + paddleHeight / 2;
           ballSpeedX = 6;
-          ballSpeedY = Math.random() * 8 - 4;
+          ballSpeedY = Math.random() * 4 - 2;
           awaitingServe = false;
           // 玩家發球時切換圖片
           currentPlayerImg = playerImg2;
